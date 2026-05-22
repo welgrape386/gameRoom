@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { FormEvent, KeyboardEvent } from 'react';
 import type { ChatMessage, Character } from '../../App';
 
 interface Props {
@@ -11,31 +11,46 @@ interface Props {
 
 export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState('');
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   const playerChar = chars.find(c => c.id === playerCharId);
 
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
   const fmtTime = (d: Date) => {
-    const h = d.getHours().toString().padStart(2, '0');
-    const m = d.getMinutes().toString().padStart(2, '0');
+    const date = d instanceof Date ? d : new Date(d);
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
     return `${h}:${m}`;
   };
 
   const handleSend = () => {
     const trimmed = inputValue.trim();
     if (!trimmed || !playerCharId) return;
+
     onSendMessage(trimmed);
     setInputValue('');
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+  };
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    handleSend();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSend();
+    if (e.key !== 'Enter') return;
+    if (e.nativeEvent.isComposing) return;
+
+    e.preventDefault();
+    handleSend();
   };
 
   return (
@@ -44,15 +59,23 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
       style={{
         width: '100%',
         height: '100%',
+        minHeight: 0,
+        maxHeight: '100%',
+        overflow: 'hidden',
         background: '#070712',
         borderLeft: '1px solid #14143a',
         fontFamily: "'MaruMinya', monospace",
+        position: 'relative',
+        zIndex: 200,
       }}
     >
       <div
-        className="flex items-center gap-2 shrink-0"
+        className="flex items-center gap-2"
         style={{
           height: 54,
+          minHeight: 54,
+          maxHeight: 54,
+          flexShrink: 0,
           padding: '0 14px',
           borderBottom: '2px solid #14143a',
           background: '#090914',
@@ -68,19 +91,32 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
             boxShadow: '0 0 8px #22c55e',
           }}
         />
-        <span style={{ fontSize: 'clamp(11px, 0.85vw, 14px)', color: '#4ade80' }}># 친구들의-방</span>
+
+        <span style={{ fontSize: 'clamp(11px, 0.85vw, 14px)', color: '#4ade80' }}>
+          # 친구들의-방
+        </span>
+
         <div className="flex-1" />
-        <span style={{ fontSize: 'clamp(8px, 0.65vw, 11px)', color: '#64748b' }}>{messages.length}개</span>
+
+        <span style={{ fontSize: 'clamp(8px, 0.65vw, 11px)', color: '#64748b' }}>
+          {messages.length}개
+        </span>
       </div>
 
       <div
-        className="shrink-0 flex gap-2 items-center flex-wrap"
+        className="flex gap-2 items-center flex-wrap"
         style={{
+          flexShrink: 0,
           padding: '10px 14px',
           borderBottom: '1px solid #0d0d2a',
+          maxHeight: 74,
+          overflow: 'hidden',
         }}
       >
-        <span style={{ fontSize: 'clamp(8px, 0.65vw, 10px)', color: '#64748b' }}>온라인</span>
+        <span style={{ fontSize: 'clamp(8px, 0.65vw, 10px)', color: '#64748b' }}>
+          온라인
+        </span>
+
         {chars.map(c => (
           <div key={c.id} className="flex items-center gap-1" title={c.fullName}>
             <div
@@ -92,6 +128,7 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
                 boxShadow: `0 0 5px ${c.primaryColor}`,
               }}
             />
+
             <span
               style={{
                 fontSize: 'clamp(8px, 0.65vw, 10px)',
@@ -108,8 +145,12 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto"
         style={{
+          flex: '1 1 0',
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
           padding: '10px 0',
           scrollbarWidth: 'thin',
           scrollbarColor: '#1e1e3a transparent',
@@ -118,7 +159,13 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
             <span style={{ fontSize: 'clamp(20px, 1.5vw, 28px)' }}>🌧️</span>
-            <span style={{ fontSize: 'clamp(10px, 0.75vw, 12px)', color: '#64748b', textAlign: 'center' }}>
+            <span
+              style={{
+                fontSize: 'clamp(10px, 0.75vw, 12px)',
+                color: '#64748b',
+                textAlign: 'center',
+              }}
+            >
               고요한 새벽...
             </span>
           </div>
@@ -170,8 +217,16 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
                   {msg.charName}
                   {msg.isPlayer ? ' ★' : ''}
                 </span>
-                <span style={{ fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#475569' }}>{fmtTime(msg.time)}</span>
-                {msg.isReaction && <span style={{ fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#38bdf8' }}>↩</span>}
+
+                <span style={{ fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#475569' }}>
+                  {fmtTime(msg.time)}
+                </span>
+
+                {msg.isReaction && (
+                  <span style={{ fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#38bdf8' }}>
+                    ↩
+                  </span>
+                )}
               </div>
 
               <div
@@ -204,16 +259,22 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
               />
             ))}
           </div>
-          <span style={{ fontSize: 'clamp(8px, 0.65vw, 10px)', color: '#475569' }}>누군가 입력 중...</span>
+
+          <span style={{ fontSize: 'clamp(8px, 0.65vw, 10px)', color: '#475569' }}>
+            누군가 입력 중...
+          </span>
         </div>
       </div>
 
       {playerChar ? (
-        <div
-          className="shrink-0"
+        <form
+          onSubmit={handleSubmit}
           style={{
+            flexShrink: 0,
             padding: 12,
             borderTop: '2px solid #14143a',
+            background: '#070712',
+            boxSizing: 'border-box',
           }}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -226,10 +287,18 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
                 boxShadow: '0 0 6px #fbbf24',
               }}
             />
+
             <span style={{ fontSize: 'clamp(8px, 0.65vw, 10px)', color: '#fbbf24' }}>
               {playerChar.name}으로 입력 중
             </span>
-            <span style={{ fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#64748b', marginLeft: 'auto' }}>
+
+            <span
+              style={{
+                fontSize: 'clamp(7px, 0.6vw, 9px)',
+                color: '#64748b',
+                marginLeft: 'auto',
+              }}
+            >
               Enter
             </span>
           </div>
@@ -244,11 +313,13 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
             }}
           >
             <input
+              ref={inputRef}
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="메시지 보내기..."
               maxLength={60}
+              autoComplete="off"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -263,7 +334,7 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
             />
 
             <button
-              onClick={handleSend}
+              type="submit"
               disabled={!inputValue.trim()}
               style={{
                 background: inputValue.trim() ? playerChar.primaryColor : '#1e1e3a',
@@ -280,14 +351,30 @@ export function ChatBox({ messages, chars, playerCharId, onSendMessage }: Props)
             </button>
           </div>
 
-          <div style={{ marginTop: 8, fontSize: 'clamp(7px, 0.6vw, 9px)', color: '#38648f', lineHeight: 1.4 }}>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 'clamp(7px, 0.6vw, 9px)',
+              color: '#38648f',
+              lineHeight: 1.4,
+            }}
+          >
             💡 “발로 ㄱ?” “배그 킬게요” 입력 시 게임룸 이동
           </div>
-        </div>
+        </form>
       ) : (
-        <div className="shrink-0" style={{ padding: 12, borderTop: '2px solid #14143a' }}>
+        <div
+          style={{
+            flexShrink: 0,
+            padding: 12,
+            borderTop: '2px solid #14143a',
+            background: '#070712',
+          }}
+        >
           <div style={{ padding: 12, background: '#0f0f1e', border: '1px solid #1e1e3a' }}>
-            <span style={{ fontSize: 'clamp(9px, 0.7vw, 11px)', color: '#64748b' }}>#방에서 메시지 보내기</span>
+            <span style={{ fontSize: 'clamp(9px, 0.7vw, 11px)', color: '#64748b' }}>
+              #방에서 메시지 보내기
+            </span>
           </div>
         </div>
       )}

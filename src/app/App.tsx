@@ -5,12 +5,11 @@ import { CharacterSelect } from './components/CharacterSelect';
 import { TopBar } from './components/layout/TopBar';
 import { LeftRooms } from './components/layout/LeftRooms';
 import { CenterArea } from './components/layout/CenterArea';
-import { RightPanel } from './components/layout/RightPanel';
 import { ChatBox } from './components/layout/ChatBox';
 
 export type CharacterState = 'walking' | 'sitting' | 'lying' | 'idle';
 export type CharacterPersonality = 'intense' | 'social' | 'lazy' | 'passive' | 'calm';
-export type PanelId = 'dev' | 'game' | 'kamong';
+export type PanelId = 'dev' | 'game' | 'kamong' | 'afk';
 export type GameType = 'pubg' | 'valorant' | null;
 
 export interface Character {
@@ -37,6 +36,7 @@ export interface Character {
   emoji: string;
   online: boolean;
   walkStep: number;
+  currentRoom: PanelId;
 }
 
 export interface ChatMessage {
@@ -52,8 +52,8 @@ export interface ChatMessage {
 
 const MIN_X = 8;
 const MAX_X = 92;
-const MIN_Y = 54;
-const MAX_Y = 76;
+const MIN_Y = 18;
+const MAX_Y = 58;
 
 const clamp = (value: number, min: number, max: number) => {
   return Math.max(min, Math.min(max, value));
@@ -66,7 +66,6 @@ const safePos = (x: number, y: number) => {
   };
 };
 
-// 게임 시작 시 앉는 위치
 const GAME_POSITIONS: Record<string, { x: number; y: number }> = {
   minseon: { x: 16, y: 58 },
   yeomtoli: { x: 32, y: 58 },
@@ -80,40 +79,30 @@ function pickTarget(char: Character): { x: number; y: number; state: CharacterSt
 
   if (char.personality === 'lazy') {
     if (r < 0.6) {
-      const pos = safePos(68 + Math.random() * 18, 62 + Math.random() * 10);
+      const pos = safePos(68 + Math.random() * 18, 50 + Math.random() * 8);
       return { ...pos, state: 'lying' };
     }
 
-    if (r < 0.82) {
-      const pos = safePos(50 + Math.random() * 35, 58 + Math.random() * 14);
-      return { ...pos, state: 'idle' };
-    }
-
-    const pos = safePos(20 + Math.random() * 55, 56 + Math.random() * 18);
-    return { ...pos, state: 'walking' };
+    const pos = safePos(50 + Math.random() * 35, 35 + Math.random() * 20);
+    return { ...pos, state: r < 0.82 ? 'idle' : 'walking' };
   }
 
   if (char.personality === 'intense') {
     if (r < 0.5) {
-      const pos = safePos(8 + Math.random() * 18, 56 + Math.random() * 10);
+      const pos = safePos(8 + Math.random() * 18, 45 + Math.random() * 10);
       return { ...pos, state: 'sitting' };
     }
 
-    if (r < 0.72) {
-      const pos = safePos(8 + Math.random() * 35, 56 + Math.random() * 14);
-      return { ...pos, state: 'idle' };
-    }
-
-    const pos = safePos(8 + Math.random() * 55, 56 + Math.random() * 18);
-    return { ...pos, state: 'walking' };
+    const pos = safePos(8 + Math.random() * 55, 25 + Math.random() * 30);
+    return { ...pos, state: r < 0.72 ? 'idle' : 'walking' };
   }
 
   if (char.personality === 'social') {
-    const pos = safePos(10 + Math.random() * 78, 56 + Math.random() * 18);
+    const pos = safePos(10 + Math.random() * 78, 22 + Math.random() * 34);
     return { ...pos, state: 'walking' };
   }
 
-  const pos = safePos(15 + Math.random() * 65, 56 + Math.random() * 18);
+  const pos = safePos(15 + Math.random() * 65, 25 + Math.random() * 30);
   return {
     ...pos,
     state: r < 0.45 ? 'walking' : 'idle',
@@ -136,7 +125,7 @@ function hasGameKeyword(text: string) {
 const INITIAL_CHARS: Character[] = [
   {
     id: 'minseon',
-    name: '민선',
+    name: '김민선',
     fullName: '김민선',
     age: 24,
     gender: 'f',
@@ -152,15 +141,27 @@ const INITIAL_CHARS: Character[] = [
     facing: 'right',
     speechBubble: null,
     speechTimer: 0,
-    dialogues: ['야 시끄러워', '배포 망했어 ㅡㅡ', '왜 이게 안 돼', '집중 좀.', '진짜 미치겠다', 'npm 또 오류', '잠깐만'],
+    dialogues: [
+      '저 잠깐 통화중~쓰',
+      '다들 일어나십쇼!',
+      '자자 일어난 순으로 게임 입장하실게요~',
+      '발로란트 하면서 동시에 스팀 다운 안되지?',
+      '치즈볼만 포장할까 했는데 가게에 직원이 없음이슈',
+      '백업한 줄 알았는데 안하고 초기화했다~',
+      '자 다시 저번주로 돌아가볼까나?',
+      '왜 이게 안 돼',
+      '진짜 미치겠다',
+    ],
     reactDialogues: {
       enggdengi: ['.알았어', '고마워'],
       yeomtoli: ['야 지금 바빠', '잠깐만'],
+      kamong: ['아 그렇구나', '오케이'],
     },
     personality: 'intense',
     emoji: '👩‍💻',
     online: true,
     walkStep: 0,
+    currentRoom: 'afk',
   },
   {
     id: 'yeomtoli',
@@ -169,18 +170,26 @@ const INITIAL_CHARS: Character[] = [
     age: 29,
     gender: 'm',
     role: '사회적 리더',
-    primaryColor: '#38bdf8',
-    hairColor: '#1e1b4b',
-    skinColor: '#e8c090',
-    x: 32,
-    y: 60,
-    targetX: 32,
-    targetY: 60,
+    primaryColor: '#fb923c',
+    hairColor: '#78350f',
+    skinColor: '#fdd9b5',
+    x: 56,
+    y: 56,
+    targetX: 56,
+    targetY: 56,
     state: 'walking',
     facing: 'right',
     speechBubble: null,
     speechTimer: 0,
-    dialogues: ['야야야 들어봐', '발로 ㄱ?', '배그 킬게요', 'ㅋㅋㅋ 진짜?', '야 진정해!!', '다들 뭐해 ㅋㅋ', '치킨 먹자'],
+    dialogues: [
+      '나 잠시만',
+      '야야야 들어봐',
+      '발로 ㄱ?',
+      '배그 킬게요',
+      '다들 뭐해 ㅋㅋ',
+      'ㅋㅋㅋ 진짜?',
+      '야 진정해!!',
+    ],
     reactDialogues: {
       minseon: ['민선아 진정해', '야 괜찮아?'],
       kamong: ['카몽 일어나 ㅋㅋ', '야 자냐?'],
@@ -189,26 +198,38 @@ const INITIAL_CHARS: Character[] = [
     emoji: '🎮',
     online: true,
     walkStep: 0,
+    currentRoom: 'afk',
   },
   {
     id: 'kamong',
     name: '카몽',
     fullName: '카몽',
-    age: 27,
+    age: 26,
     gender: 'm',
     role: '홈바디',
     primaryColor: '#94a3b8',
     hairColor: '#1f2937',
     skinColor: '#fde8a0',
     x: 74,
-    y: 68,
+    y: 56,
     targetX: 74,
-    targetY: 68,
+    targetY: 56,
     state: 'lying',
     facing: 'left',
     speechBubble: null,
     speechTimer: 0,
-    dialogues: ['집', '나 졸려', '배고파', '.', 'ㅋ', '어', '그래', '뭐', '잠깐'],
+    dialogues: [
+      '실시간으로 사라지네',
+      '머냐',
+      '되긴 할텐데',
+      '인터넷 안 좋으면 렉걸림',
+      '?',
+      '역시 내가 기억 못하는거였고',
+      '하하 밖인데 조오졌네',
+      '2시 10분까지 열심히 들어가겠슴다',
+      '집',
+      '잠깐',
+    ],
     reactDialogues: {
       yeomtoli: ['어', '알겠어'],
       minseon: ['ㅋ', '.'],
@@ -217,26 +238,27 @@ const INITIAL_CHARS: Character[] = [
     emoji: '😴',
     online: true,
     walkStep: 0,
+    currentRoom: 'afk',
   },
   {
     id: 'kyunggeun',
     name: '변경근',
     fullName: '변경근',
-    age: 23,
+    age: 22,
     gender: 'm',
     role: '막내',
     primaryColor: '#34d399',
     hairColor: '#111827',
     skinColor: '#fcd9b0',
     x: 44,
-    y: 64,
+    y: 56,
     targetX: 44,
-    targetY: 64,
+    targetY: 56,
     state: 'idle',
     facing: 'right',
     speechBubble: null,
     speechTimer: 0,
-    dialogues: ['알겠습니당', '저도요.', 'ㄴ네', '어 어 맞아요', '죄송합니다 ㅎ', '저 해볼게요!', '네넵'],
+    dialogues: ['네네', '알겠습니당', '저도요.', 'ㄴ네', '어 어 맞아요', '죄송합니다 ㅎ', '저 해볼게요!', '네넵'],
     reactDialogues: {
       yeomtoli: ['알겠습니당', '넵!'],
       minseon: ['괜찮으세요...?', '도와드릴까요?'],
@@ -245,21 +267,22 @@ const INITIAL_CHARS: Character[] = [
     emoji: '🙂',
     online: true,
     walkStep: 0,
+    currentRoom: 'afk',
   },
   {
     id: 'enggdengi',
     name: '엉덩이',
     fullName: '엉덩이',
-    age: 27,
+    age: 26,
     gender: 'm',
     role: '감정 지지',
-    primaryColor: '#fb923c',
-    hairColor: '#78350f',
-    skinColor: '#fdd9b5',
-    x: 56,
-    y: 66,
-    targetX: 56,
-    targetY: 66,
+    primaryColor: '#38bdf8',
+    hairColor: '#1e1b4b',
+    skinColor: '#e8c090',
+    x: 32,
+    y: 58,
+    targetX: 32,
+    targetY: 58,
     state: 'idle',
     facing: 'right',
     speechBubble: null,
@@ -273,8 +296,22 @@ const INITIAL_CHARS: Character[] = [
     emoji: '🫂',
     online: true,
     walkStep: 0,
+    currentRoom: 'afk',
   },
 ];
+
+function canEnterRoom(charId: string, room: PanelId) {
+  // 잠수방 복귀는 모든 캐릭터가 가능해야 게임/개발 종료가 정상 동작함
+  if (room === 'afk') return true;
+
+  // 김민선은 개발방/게임방만 이동 가능
+  if (charId === 'minseon') {
+    return room === 'dev' || room === 'game';
+  }
+
+  // 나머지 캐릭터는 개발방 제외 이동 가능
+  return room !== 'dev';
+}
 
 export default function App() {
   const [gamePhase, setGamePhase] = useState<'select' | 'playing'>('select');
@@ -284,7 +321,7 @@ export default function App() {
   const [selectedPanel, setSelectedPanel] = useState<PanelId>('dev');
   const [gameType, setGameType] = useState<GameType>(null);
   const [gameTriggered, setGameTriggered] = useState(false);
-  const [enggdengiAtKamong, setEnggdengiAtKamong] = useState(false);
+  const [enggdengiAtKamong] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
   const gameTimeRef = useRef(new Date());
@@ -297,26 +334,53 @@ export default function App() {
     setGamePhase('playing');
   }, []);
 
-  const addMessage = useCallback(
-    (charId: string, text: string, opts?: { isReaction?: boolean; isPlayer?: boolean }) => {
-      const char = INITIAL_CHARS.find(c => c.id === charId);
-      if (!char) return;
+  const moveCharacterToRoom = useCallback((charId: string, room: PanelId) => {
+    setChars(prev =>
+      prev.map(char => {
+        if (char.id !== charId) return char;
 
-      setMessages(prev => [
-        ...prev.slice(-80),
-        {
-          id: Date.now() + Math.random(),
-          charId,
-          charName: char.name,
-          color: char.primaryColor,
-          text,
-          time: new Date(gameTimeRef.current),
-          ...opts,
-        },
-      ]);
-    },
-    []
-  );
+        if (!canEnterRoom(char.id, room)) {
+          return {
+            ...char,
+            speechBubble: char.id === 'minseon' ? '김민선은 개발방/게임방만!' : '개발방은 못 가!',
+            speechTimer: 3,
+          };
+        }
+
+        return {
+          ...char,
+          currentRoom: room,
+          speechBubble:
+            room === 'game'
+              ? '게임방 입장!'
+              : room === 'kamong'
+              ? '카몽집 도착'
+              : room === 'afk'
+              ? '잠수방 복귀'
+              : '개발방 입장!',
+          speechTimer: 3,
+        };
+      })
+    );
+  }, []);
+
+  const addMessage = useCallback((charId: string, text: string, opts?: { isReaction?: boolean; isPlayer?: boolean }) => {
+    const char = INITIAL_CHARS.find(c => c.id === charId);
+    if (!char) return;
+
+    setMessages(prev => [
+      ...prev.slice(-80),
+      {
+        id: Date.now() + Math.random(),
+        charId,
+        charName: char.name,
+        color: char.primaryColor,
+        text,
+        time: new Date(gameTimeRef.current),
+        ...opts,
+      },
+    ]);
+  }, []);
 
   const triggerGame = useCallback(
     (type: GameType) => {
@@ -330,9 +394,19 @@ export default function App() {
       const label = type === 'pubg' ? '배틀그라운드' : type === 'valorant' ? '발로란트' : '게임';
       setNotification(`🎮 ${label} 시작!! 전원 게임 중...`);
 
-      setTimeout(() => addMessage('kyunggeun', '알겠습니당', { isReaction: true }), 700);
-      setTimeout(() => addMessage('kamong', '...어', { isReaction: true }), 1500);
-      setTimeout(() => addMessage('enggdengi', '좋지 ㅎㅎ', { isReaction: true }), 2000);
+      const gameReactions: Array<[string, string, number]> = [
+        ['kyunggeun', '알겠습니당', 700],
+        ['kamong', '...어', 1500],
+        ['enggdengi', '좋지 ㅎㅎ', 2000],
+      ];
+
+      gameReactions.forEach(([id, text, delay]) => {
+        if (id === playerCharId) return;
+
+        setTimeout(() => {
+          addMessage(id, text, { isReaction: true });
+        }, delay);
+      });
 
       setTimeout(() => {
         setChars(prev =>
@@ -366,7 +440,7 @@ export default function App() {
         setNotification(null);
       }, 5500);
     },
-    [addMessage]
+    [addMessage, playerCharId]
   );
 
   const sendPlayerMessage = useCallback(
@@ -431,7 +505,6 @@ export default function App() {
     return () => window.clearInterval(iv);
   }, []);
 
-  // 캐릭터 이동 루프
   useEffect(() => {
     const iv = window.setInterval(() => {
       setChars(prev =>
@@ -510,15 +583,18 @@ export default function App() {
     return () => window.clearInterval(iv);
   }, []);
 
-  // 자동 대화
   useEffect(() => {
+    if (gamePhase !== 'playing') return;
+
     let t: ReturnType<typeof setTimeout>;
 
     const schedule = () => {
       t = setTimeout(() => {
         setChars(prev => {
-          const idx = Math.floor(Math.random() * prev.length);
-          const speaker = prev[idx];
+          const autoChars = prev.filter(c => c.id !== playerCharId);
+          if (autoChars.length === 0) return prev;
+
+          const speaker = autoChars[Math.floor(Math.random() * autoChars.length)];
           const line = speaker.dialogues[Math.floor(Math.random() * speaker.dialogues.length)];
 
           addMessage(speaker.id, line);
@@ -530,32 +606,35 @@ export default function App() {
           }
 
           if (Math.random() < 0.5) {
-            const others = prev.filter((_, i) => i !== idx);
-            const reactor = others[Math.floor(Math.random() * others.length)];
-            const reacts = reactor.reactDialogues[speaker.id];
-            const reactLine = reacts
-              ? reacts[Math.floor(Math.random() * reacts.length)]
-              : reactor.dialogues[Math.floor(Math.random() * reactor.dialogues.length)];
+            const others = prev.filter(c => c.id !== speaker.id && c.id !== playerCharId);
 
-            setTimeout(() => {
-              addMessage(reactor.id, reactLine, { isReaction: true });
+            if (others.length > 0) {
+              const reactor = others[Math.floor(Math.random() * others.length)];
+              const reacts = reactor.reactDialogues[speaker.id];
+              const reactLine = reacts
+                ? reacts[Math.floor(Math.random() * reacts.length)]
+                : reactor.dialogues[Math.floor(Math.random() * reactor.dialogues.length)];
 
-              setChars(c =>
-                c.map(ch =>
-                  ch.id === reactor.id
-                    ? {
-                        ...ch,
-                        speechBubble: reactLine,
-                        speechTimer: 5,
-                      }
-                    : ch
-                )
-              );
-            }, 1000 + Math.random() * 1200);
+              setTimeout(() => {
+                addMessage(reactor.id, reactLine, { isReaction: true });
+
+                setChars(c =>
+                  c.map(ch =>
+                    ch.id === reactor.id
+                      ? {
+                          ...ch,
+                          speechBubble: reactLine,
+                          speechTimer: 5,
+                        }
+                      : ch
+                  )
+                );
+              }, 1000 + Math.random() * 1200);
+            }
           }
 
-          return prev.map((c, i) =>
-            i === idx
+          return prev.map(c =>
+            c.id === speaker.id
               ? {
                   ...c,
                   speechBubble: line,
@@ -572,9 +651,8 @@ export default function App() {
     schedule();
 
     return () => clearTimeout(t);
-  }, [addMessage, triggerGame]);
+  }, [gamePhase, playerCharId, addMessage, triggerGame]);
 
-  // 말풍선 타이머
   useEffect(() => {
     const iv = window.setInterval(() => {
       setChars(prev =>
@@ -597,8 +675,10 @@ export default function App() {
     return () => window.clearInterval(iv);
   }, []);
 
-  // 초기 메시지
   useEffect(() => {
+    if (gamePhase !== 'playing') return;
+    if (!playerCharId) return;
+
     const seedMessages: Array<[string, string]> = [
       ['yeomtoli', '야야야 들어봐'],
       ['kamong', '집'],
@@ -607,10 +687,12 @@ export default function App() {
       ['enggdengi', '괜찮아 괜찮아'],
     ];
 
-    seedMessages.forEach(([id, text], i) => {
-      setTimeout(() => addMessage(id, text), i * 700);
-    });
-  }, [addMessage]);
+    seedMessages
+      .filter(([id]) => id !== playerCharId)
+      .forEach(([id, text], i) => {
+        setTimeout(() => addMessage(id, text), i * 700);
+      });
+  }, [gamePhase, playerCharId, addMessage]);
 
   if (gamePhase === 'select') {
     return (
@@ -659,12 +741,13 @@ export default function App() {
       <div
         style={{
           width: '100%',
-          flex: 1,
+          height: 'calc(100vh - 56px)',
+          maxHeight: 'calc(100vh - 56px)',
           minHeight: 0,
           overflow: 'hidden',
           display: 'grid',
           gridTemplateColumns:
-            'clamp(150px, 14vw, 220px) minmax(0, 1fr) clamp(260px, 26vw, 400px) clamp(210px, 18vw, 260px)',
+            'clamp(150px, 14vw, 220px) minmax(0, 1fr) clamp(210px, 18vw, 260px)',
         }}
       >
         <LeftRooms
@@ -675,12 +758,11 @@ export default function App() {
           enggdengiAtKamong={enggdengiAtKamong}
         />
 
-        <CenterArea chars={chars} playerCharId={playerCharId} />
-
-        <RightPanel
+        <CenterArea
+          chars={chars}
+          playerCharId={playerCharId}
           selectedPanel={selectedPanel}
-          gameType={gameType}
-          gameTriggered={gameTriggered}
+          onMoveCharacterToRoom={moveCharacterToRoom}
         />
 
         <ChatBox

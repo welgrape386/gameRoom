@@ -1,4 +1,4 @@
-import { Monitor, Gamepad2, Home } from 'lucide-react';
+import { Monitor, Gamepad2, Home, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { PanelId, GameType } from '../../App';
 
@@ -50,7 +50,11 @@ export function LeftRooms({
         color="#38bdf8"
         badge={gameTriggered ? '🎮 LIVE' : undefined}
       >
-        {gameType === 'pubg' ? 'PUBG' : gameType === 'valorant' ? 'VALORANT' : '5 PCs'}
+        {gameType === 'pubg'
+          ? 'PUBG'
+          : gameType === 'valorant'
+          ? 'VALORANT'
+          : '5 PCs'}
       </RoomCard>
 
       <RoomCard
@@ -62,6 +66,16 @@ export function LeftRooms({
         badge={enggdengiAtKamong ? '👤 방문중' : undefined}
       >
         🏠 HOME
+      </RoomCard>
+
+      <RoomCard
+        title="잠수방"
+        icon={<Moon size={22} />}
+        selected={selectedPanel === 'afk'}
+        onClick={() => onSelectPanel('afk')}
+        color="#fbbf24"
+      >
+        Zzz AFK
       </RoomCard>
     </div>
   );
@@ -77,7 +91,15 @@ interface RoomCardProps {
   children: React.ReactNode;
 }
 
-function RoomCard({ title, icon, selected, onClick, color, badge, children }: RoomCardProps) {
+function RoomCard({
+  title,
+  icon,
+  selected,
+  onClick,
+  color,
+  badge,
+  children,
+}: RoomCardProps) {
   return (
     <motion.button
       onClick={onClick}
@@ -108,7 +130,9 @@ function RoomCard({ title, icon, selected, onClick, color, badge, children }: Ro
           boxSizing: 'border-box',
         }}
       >
-        <div style={{ color, display: 'flex', alignItems: 'center' }}>{icon}</div>
+        <div style={{ color, display: 'flex', alignItems: 'center' }}>
+          {icon}
+        </div>
 
         <div
           style={{

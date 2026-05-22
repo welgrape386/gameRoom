@@ -10,11 +10,11 @@ interface Props {
 }
 
 const CHAR_DESCRIPTIONS: Record<string, string[]> = {
-  minseon: ['밤새 코딩', '감정 폭발', '천재 개발자'],
-  yeomtoli: ['항상 활발', '게임 선두', '분위기 메이커'],
-  kamong: ['집만 좋아', '잠 최고', '한 마디면 충분'],
+  minseon: ['밤새 코딩', '감정 폭발', '미친 개발자'],
+  yeomtoli: ['늙은이', '모자르지만 착함', '분위기 메이커'],
+  kamong: ['사차원', '쓸 데 없이 무언갈 잘함', '집돌이'],
   kyunggeun: ['알겠습니당', '착한 막내', '다 따라가'],
-  enggdengi: ['다 괜찮아', '감정 쿠션', '카몽집 단골'],
+  enggdengi: ['여미새', '살짝 미쳐있음', '다정함'],
 };
 
 export function CharacterSelect({ chars, onSelect }: Props) {
