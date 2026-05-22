@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import type { Character, PanelId } from '../../App';
 import { CharSprite } from '../shared/PixelChar';
 
@@ -67,7 +68,12 @@ export function CenterArea({
         fontFamily: "'MaruMinya', monospace",
       }}
     >
-      {selectedPanel === 'dev' && <DevRoom />}
+      {selectedPanel === 'dev' && (
+        <DevRoom
+          chars={chars}
+          onMoveCharacterToRoom={onMoveCharacterToRoom}
+        />
+      )}
 
       {selectedPanel === 'game' && (
         <GameRoom
@@ -148,9 +154,61 @@ function RoomTitle({
   );
 }
 
-function DevRoom() {
+function DevRoom({
+  chars,
+  onMoveCharacterToRoom,
+}: {
+  chars: Character[];
+  onMoveCharacterToRoom: (charId: string, room: PanelId) => void;
+}) {
   const [typedText, setTypedText] = useState('');
+  const [devEventText, setDevEventText] = useState<string | null>(null);
+  const [devEventShake, setDevEventShake] = useState(false);
+  const [devEventRunning, setDevEventRunning] = useState(false);
+
   const fullText = DEV_CODE_LINES.map(line => `> ${line}`).join('\n');
+  const minseonInDev = chars.some(char => char.id === 'minseon' && char.currentRoom === 'dev');
+
+  const handleDevExit = () => {
+    if (!minseonInDev || devEventRunning) return;
+
+    setDevEventRunning(true);
+
+    const isCrashEvent = Math.random() < 0.45;
+
+    if (!isCrashEvent) {
+      setDevEventText('EVENT · 개발을 종료합니다.');
+      setDevEventShake(false);
+
+      window.setTimeout(() => {
+        setDevEventText(null);
+        setDevEventRunning(false);
+        onMoveCharacterToRoom('minseon', 'afk');
+      }, 3000);
+
+      return;
+    }
+
+    setDevEventText('EVENT · 30퍼센트 확률로 Ctrl + S 를 누르지 않아 파일이 모두 날아갑니다.');
+    setDevEventShake(false);
+
+    window.setTimeout(() => {
+      setDevEventText('EVENT · 김민선이 절규합니다.');
+      setDevEventShake(false);
+    }, 3000);
+
+    window.setTimeout(() => {
+      setDevEventText('끄아아아아아악... 아니야 ... 이게 아니야...!!!');
+      setDevEventShake(true);
+    }, 5000);
+
+    window.setTimeout(() => {
+      setDevEventText(null);
+      setDevEventShake(false);
+      setDevEventRunning(false);
+      onMoveCharacterToRoom('minseon', 'afk');
+    }, 10000);
+  };
 
   useEffect(() => {
     setTypedText('');
@@ -188,20 +246,29 @@ function DevRoom() {
           overflow: 'hidden',
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={handleDevExit}
+          disabled={!minseonInDev || devEventRunning}
+          title={minseonInDev ? '김민선 개발 종료' : '김민선이 개발방에 없습니다'}
           style={{
+            width: '100%',
             height: 34,
             background: 'rgba(168,85,247,0.133)',
+            border: 'none',
             borderBottom: '2px solid rgba(168,85,247,0.4)',
             display: 'flex',
             alignItems: 'center',
             padding: '0 14px',
-            color: '#a855f7',
+            color: minseonInDev ? '#a855f7' : '#64748b',
             fontSize: 'clamp(10px, 0.8vw, 13px)',
+            cursor: minseonInDev && !devEventRunning ? 'pointer' : 'default',
+            fontFamily: "'MaruMinya', monospace",
+            textAlign: 'left',
           }}
         >
           ● ● ● &nbsp; minseon-dev-terminal
-        </div>
+        </button>
 
         <div
           style={{
@@ -229,6 +296,12 @@ function DevRoom() {
             }}
           />
         </div>
+
+        {devEventText && (
+          <EventBox color="#a855f7" shake={devEventShake}>
+            {devEventText}
+          </EventBox>
+        )}
       </div>
 
       <style>
@@ -236,6 +309,20 @@ function DevRoom() {
           @keyframes blink {
             0%, 45% { opacity: 1; }
             46%, 100% { opacity: 0; }
+          }
+
+          @keyframes devEventShake {
+            0% { transform: translateX(-50%) translate(0, 0); }
+            10% { transform: translateX(-50%) translate(-4px, 3px); }
+            20% { transform: translateX(-50%) translate(5px, -3px); }
+            30% { transform: translateX(-50%) translate(-6px, 2px); }
+            40% { transform: translateX(-50%) translate(4px, 4px); }
+            50% { transform: translateX(-50%) translate(-3px, -5px); }
+            60% { transform: translateX(-50%) translate(6px, 3px); }
+            70% { transform: translateX(-50%) translate(-5px, -2px); }
+            80% { transform: translateX(-50%) translate(4px, -4px); }
+            90% { transform: translateX(-50%) translate(-3px, 3px); }
+            100% { transform: translateX(-50%) translate(0, 0); }
           }
         `}
       </style>
@@ -1231,9 +1318,11 @@ function KamongRoom({ chars }: { chars: Character[] }) {
 function EventBox({
   children,
   color,
+  shake = false,
 }: {
   children: React.ReactNode;
   color: string;
+  shake?: boolean;
 }) {
   return (
     <div
@@ -1242,6 +1331,7 @@ function EventBox({
         left: '50%',
         bottom: '5%',
         transform: 'translateX(-50%)',
+        animation: shake ? 'devEventShake 0.16s linear infinite' : 'none',
         width: 'min(82%, 760px)',
         minHeight: 54,
         background: '#020617',
